@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nebula Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;600&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: url('https://images.unsplash.com/photo-1534447677768-be436bb09401?q=80&w=1000&auto=format&fit=crop') no-repeat center center fixed;
+            background-size: cover;
+            color: #ffffff;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden; 
+        }
+
+        .player-container {
+            width: 100%;
+            max-width: 450px;
+            height: 100vh; 
+            background: rgba(5, 5, 20, 0.25);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            padding: 40px 25px 30px;
+            box-shadow: inset 0 0 50px rgba(0, 255, 255, 0.05);
+        }
+
+        svg {
+            fill: currentColor;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            transition: opacity 0.2s ease, transform 0.1s ease, color 0.2s ease;
+        }
+        
+        svg:active { transform: scale(0.9); }
+
+        .active-mode { color: #00ffff !important; text-shadow: 0 0 10px rgba(0, 255, 255, 0.5); }
+
+        /* 1. Header */
+        .header {
+            display: flex;
+            justify-content: center; /* Centered since we removed the side icons */
+            align-items: center;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 40px;
+        }
+        .header-title { font-weight: 300; font-size: 0.75rem; }
+
+        /* 2. Album Art */
+        .album-art-area {
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(0, 255, 255, 0.1);
+            margin-bottom: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: rgba(255, 255, 255, 0.3);
+            overflow: hidden; 
+            position: relative;
+        }
+        .album-art-area svg { width: 64px; height: 64px; opacity: 0.5; position: absolute; }
+        #cover-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none; 
+            z-index: 2;
+        }
+
+        /* 3. Track Info */
+        .track-info { margin-bottom: 30px; }
+        .track-title {
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .track-artist {
+            font-size: 1.1rem;
+            color: #00ffff;
+            opacity: 0.8;
+            text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* 4. Progress Bar */
+        .progress-container { margin-bottom: 35px; cursor: pointer; padding: 10px 0; }
+        .progress-bar-bg {
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            position: relative;
+        }
+        .progress-bar-fill {
+            width: 0%;
+            height: 100%;
+            background: #00ffff;
+            border-radius: 2px;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        .time-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.6);
+            margin-top: 10px;
+        }
+
+        /* 5. Controls */
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .control-btn {
+            color: rgba(255, 255, 255, 0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+        .control-btn svg { width: 28px; height: 28px; }
+        .play-pause {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: #00ffff;
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+        }
+        .play-pause svg { width: 36px; height: 36px; fill: #000; }
+        
+        #repeat-one-badge {
+            display: none;
+            position: absolute;
+            font-size: 0.5rem;
+            font-weight: bold;
+            color: #000;
+            background: #00ffff;
+            border-radius: 50%;
+            width: 12px;
+            height: 12px;
+            text-align: center;
+            line-height: 12px;
+            top: -2px;
+            right: -2px;
+        }
+
+        /* 6. Footer & Volume */
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+            padding-top: 20px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+        .footer svg { width: 20px; height: 20px; }
+        
+        .volume-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 50%;
+        }
+        #volume-slider {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+        }
+        #volume-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #00ffff;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00ffff;
+        }
+    </style>
+</head>
+<body>
+
+    <audio id="audio-player"></audio>
+    <input type="file" id="folder-input" webkitdirectory directory multiple accept="audio/*" style="display: none;">
+
+    <div class="player-container">
+        
+        <div class="header">
+            <div class="header-title">Playing from Local Nebula</div>
+        </div>
+
+        <div class="album-art-area">
+            <img id="cover-image" src="" alt="Album Art">
+            <svg id="default-art-icon" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        </div>
+
+        <div class="track-info">
+            <div class="track-title" id="track-title">No Audio Loaded</div>
+            <div class="track-artist" id="track-artist">Select a folder below</div>
+        </div>
+
+        <div class="progress-container" id="progress-container">
+            <div class="progress-bar-bg">
+                <div class="progress-bar-fill" id="progress-fill"></div>
+            </div>
+            <div class="time-info">
+                <span id="current-time">0:00</span>
+                <span id="duration-time">0:00</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-btn" id="btn-shuffle">
+                <svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+            </div>
+            <div class="control-btn" id="btn-prev"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></div>
+            
+            <div class="control-btn play-pause" id="btn-play">
+                <svg id="play-icon" style="margin-left: 4px;" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                <svg id="pause-icon" style="display: none;" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            </div>
+            
+            <div class="control-btn" id="btn-next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></div>
+            
+            <div class="control-btn" id="btn-repeat">
+                <div id="repeat-one-badge">1</div>
+                <svg viewBox="0 0 24 24"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div id="btn-load-folder" title="Load Folder" style="cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 24 24"><path d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/></svg>
+                <span style="font-size: 0.8rem;">Load Files</span>
+            </div>
+            
+            <div class="volume-container">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const audioPlayer = document.getElementById('audio-player');
+        const folderInput = document.getElementById('folder-input');
+        const btnLoadFolder = document.getElementById('btn-load-folder');
+        const volumeSlider = document.getElementById('volume-slider');
+        
+        const trackTitle = document.getElementById('track-title');
+        const trackArtist = document.getElementById('track-artist');
+        const coverImage = document.getElementById('cover-image');
+        const defaultArtIcon = document.getElementById('default-art-icon');
+        
+        const playBtn = document.getElementById('btn-play');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const btnNext = document.getElementById('btn-next');
+        const btnPrev = document.getElementById('btn-prev');
+        const btnShuffle = document.getElementById('btn-shuffle');
+        const btnRepeat = document.getElementById('btn-repeat');
+        const repeatBadge = document.getElementById('repeat-one-badge');
+        
+        const progressFill = document.getElementById('progress-fill');
+        const progressContainer = document.getElementById('progress-container');
+        const currentTimeEl = document.getElementById('current-time');
+        const durationTimeEl = document.getElementById('duration-time');
+
+        // -- Data States --
+        let originalPlaylist = []; 
+        let playbackQueue = [];    
+        let queueIndex = 0;        
+        let isPlaying = false;
+        
+        let isShuffle = false;
+        let repeatMode = 0; 
+
+        // -- Volume Logic --
+        volumeSlider.addEventListener('input', (e) => {
+            audioPlayer.volume = e.target.value;
+        });
+
+        // -- OS MEDIA SESSION SETUP --
+        if ('mediaSession' in navigator) {
+            navigator.mediaSession.setActionHandler('play', () => { if(!isPlaying) playBtn.click(); });
+            navigator.mediaSession.setActionHandler('pause', () => { if(isPlaying) playBtn.click(); });
+            navigator.mediaSession.setActionHandler('previoustrack', () => playPrev());
+            navigator.mediaSession.setActionHandler('nexttrack', () => playNext(false));
+        }
+
+        function updateOSPlayer(title, artist, album, artworkUrl) {
+            if ('mediaSession' in navigator) {
+                const artworkArray = artworkUrl ? [{ src: artworkUrl, sizes: '512x512', type: 'image/jpeg' }] : [];
+                navigator.mediaSession.metadata = new MediaMetadata({
+                    title: title || 'Unknown Title',
+                    artist: artist || 'Unknown Artist',
+                    album: album || 'Nebula Player',
+                    artwork: artworkArray
+                });
+            }
+        }
+
+        // Handle Folder Load
+        btnLoadFolder.addEventListener('click', () => folderInput.click());
+
+        folderInput.addEventListener('change', (event) => {
+            const files = Array.from(event.target.files);
+            originalPlaylist = files.filter(file => file.type.startsWith('audio/'));
+            
+            if (originalPlaylist.length > 0) {
+                buildQueue();
+                queueIndex = 0;
+                loadTrack(playbackQueue[queueIndex]);
+            } else {
+                alert("No audio files found in that folder!");
+            }
+        });
+
+        // Build/Rebuild the Playback Queue
+        function buildQueue() {
+            let currentTrackIndex = playbackQueue.length > 0 ? playbackQueue[queueIndex] : 0;
+            playbackQueue = Array.from({length: originalPlaylist.length}, (_, i) => i);
+
+            if (isShuffle) {
+                playbackQueue = playbackQueue.filter(i => i !== currentTrackIndex);
+                for (let i = playbackQueue.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [playbackQueue[i], playbackQueue[j]] = [playbackQueue[j], playbackQueue[i]];
+                }
+                playbackQueue.unshift(currentTrackIndex);
+                queueIndex = 0;
+            } else {
+                queueIndex = currentTrackIndex;
+            }
+        }
+
+        // Load specific track
+        function loadTrack(fileIndex) {
+            if (originalPlaylist.length === 0) return;
+            const file = originalPlaylist[fileIndex];
+            
+            audioPlayer.src = URL.createObjectURL(file);
+
+            // Default Fallback Info
+            let cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/_/g, " ");
+            let currentTitle = cleanName;
+            let currentArtist = "Unknown Artist";
+            let currentAlbum = "Nebula Player";
+            let currentArtUrl = null;
+
+            trackTitle.innerText = currentTitle;
+            trackArtist.innerText = currentArtist;
+            coverImage.style.display = 'none';
+            defaultArtIcon.style.display = 'block';
+
+            // Extract Metadata & Album Art
+            if (window.jsmediatags) {
+                window.jsmediatags.read(file, {
+                    onSuccess: function(tag) {
+                        const tags = tag.tags;
+                        if (tags.title) { currentTitle = tags.title; trackTitle.innerText = currentTitle; }
+                        if (tags.artist) { currentArtist = tags.artist; trackArtist.innerText = currentArtist; }
+                        if (tags.album) { currentAlbum = tags.album; }
+                        
+                        if (tags.picture) {
+                            let base64String = "";
+                            for (let i = 0; i < tags.picture.data.length; i++) {
+                                base64String += String.fromCharCode(tags.picture.data[i]);
+                            }
+                            currentArtUrl = "data:" + tags.picture.format + ";base64," + window.btoa(base64String);
+                            coverImage.src = currentArtUrl;
+                            coverImage.style.display = 'block';
+                            defaultArtIcon.style.display = 'none';
+                        }
+                        
+                        updateOSPlayer(currentTitle, currentArtist, currentAlbum, currentArtUrl);
+                    },
+                    onError: function(error) {
+                        console.log("No ID3 tags found.");
+                        updateOSPlayer(currentTitle, currentArtist, currentAlbum, null);
+                    }
+                });
+            } else {
+                updateOSPlayer(currentTitle, currentArtist, currentAlbum, null);
+            }
+
+            if (isPlaying) audioPlayer.play();
+        }
+
+        // Play / Pause
+        playBtn.addEventListener('click', () => {
+            if (originalPlaylist.length === 0) return;
+            if (isPlaying) {
+                audioPlayer.pause();
+                playIcon.style.display = 'block';
+                pauseIcon.style.display = 'none';
+            } else {
+                audioPlayer.play();
+                playIcon.style.display = 'none';
+                pauseIcon.style.display = 'block';
+            }
+            isPlaying = !isPlaying;
+        });
+
+        // Next / Previous Logic
+        function playNext(isAuto = false) {
+            if (originalPlaylist.length === 0) return;
+            
+            if (isAuto && repeatMode === 2) {
+                audioPlayer.currentTime = 0;
+                audioPlayer.play();
+                return;
+            }
+
+            queueIndex++;
+            if (queueIndex >= playbackQueue.length) {
+                if (repeatMode === 1) {
+                    queueIndex = 0;
+                } else {
+                    queueIndex = playbackQueue.length - 1;
+                    audioPlayer.pause();
+                    isPlaying = false;
+                    playIcon.style.display = 'block';
+                    pauseIcon.style.display = 'none';
+                    return;
+                }
+            }
+            loadTrack(playbackQueue[queueIndex]);
+            if (isPlaying) audioPlayer.play();
+        }
+
+        function playPrev() {
+            if (originalPlaylist.length === 0) return;
+            
+            if (audioPlayer.currentTime > 3) {
+                audioPlayer.currentTime = 0;
+                return;
+            }
+
+            queueIndex--;
+            if (queueIndex < 0) {
+                queueIndex = repeatMode === 1 ? playbackQueue.length - 1 : 0;
+            }
+            loadTrack(playbackQueue[queueIndex]);
+            if (isPlaying) audioPlayer.play();
+        }
+
+        btnNext.addEventListener('click', () => playNext(false));
+        btnPrev.addEventListener('click', () => playPrev());
+        audioPlayer.addEventListener('ended', () => playNext(true));
+
+        // Shuffle Toggle
+        btnShuffle.addEventListener('click', () => {
+            if (originalPlaylist.length === 0) return;
+            isShuffle = !isShuffle;
+            btnShuffle.classList.toggle('active-mode', isShuffle);
+            buildQueue(); 
+        });
+
+        // Repeat Toggle 
+        btnRepeat.addEventListener('click', () => {
+            repeatMode = (repeatMode + 1) % 3;
+            if (repeatMode === 0) {
+                btnRepeat.classList.remove('active-mode');
+                repeatBadge.style.display = 'none';
+            } else if (repeatMode === 1) {
+                btnRepeat.classList.add('active-mode');
+                repeatBadge.style.display = 'none';
+            } else if (repeatMode === 2) {
+                btnRepeat.classList.add('active-mode');
+                repeatBadge.style.display = 'block';
+            }
+        });
+
+        // Progress Bar
+        audioPlayer.addEventListener('timeupdate', () => {
+            if (!audioPlayer.duration) return;
+            const progressPercent = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+            progressFill.style.width = `${progressPercent}%`;
+            currentTimeEl.innerText = formatTime(audioPlayer.currentTime);
+            durationTimeEl.innerText = formatTime(audioPlayer.duration);
+        });
+
+        progressContainer.addEventListener('click', (e) => {
+            if(originalPlaylist.length === 0 || !audioPlayer.duration) return;
+            const width = progressContainer.clientWidth;
+            const clickX = e.offsetX;
+            audioPlayer.currentTime = (clickX / width) * audioPlayer.duration;
+        });
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const min = Math.floor(seconds / 60);
+            const sec = Math.floor(seconds % 60);
+            return `${min}:${sec < 10 ? '0' + sec : sec}`;
+        }
+    </script>
+</body>
+</html>
